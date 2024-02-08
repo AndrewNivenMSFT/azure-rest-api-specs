@@ -14,6 +14,8 @@ alias ServiceTraits = NoRepeatableRequests &
   NoConditionalRequests &
   SupportsClientRequestId &
   RequestHeadersTrait<ApcGatewayIdHeader> &
+  // Note that ResponseHeadersTrait is overridden in number operations
+  // If you modify this, you must also modify it in the number operations.
   ResponseHeadersTrait<RequestIdResponseHeader>;
 
 alias Operations = Azure.Core.ResourceOperations<ServiceTraits, ApcErrorResponse>;

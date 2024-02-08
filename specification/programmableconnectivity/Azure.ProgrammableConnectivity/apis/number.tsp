@@ -4,6 +4,7 @@ using TypeSpec.Http;
 using TypeSpec.Rest;
 using TypeSpec.Versioning;
 using Azure.Core;
+using Azure.Core.Traits;
 
 namespace Azure.ProgrammableConnectivity;
 
@@ -11,29 +12,57 @@ namespace Azure.ProgrammableConnectivity;
 
 @doc("""
   Number operations include Frontend Authentication.
+
+  Users must first make a call to triggerFrontendAuthentication, which redirects the device
+  to the device's Network to authenticate directly. The Network responds with a token.
   
-  This means that each operation has 2 responses. 
-  
-  The first response is a 302 redirect, which redirects the device to the device's Network
-  to authenticate directly. The Network responds with another 302 redirect and a token.
   This redirects the device to APC, where the token is used to verify / retrieve
   the device number. The second response is a 200 containing the result of the query.
 
-  This flow takes place automatically without user interaction, and so only the result
-  of the entire flow (the 200 response) is included in this document.
+  This flow requires some manual interaction from the developer between receiving the 302 redirect,
+  and making a second call to obtain the number verification result. This has therefore been
+  split into two operations, one for the redirect, and one for the result.
 """)
 interface NumberVerification {
+  @doc("Verifies the phone number (MSISDN) associated with a device. As part of the frontend authorisation flow, the device is redirected to the operator network to authenticate directly.")
+  @sharedRoute
+  @action("verify")
+  verifyWithoutCode is Operations.ResourceAction<
+    NumberVerificationEndpoint,
+    NumberVerificationContent,
+    TypeSpec.Http.Response<302> & EmptyResponse,
+    TraitOverride<ResponseHeadersTrait<{
+      @header location: string;
+    } & RequestIdResponseHeader>>
+  >;
+
   @doc("Verifies the phone number (MSISDN) associated with a device.")
-  verify is Operations.ResourceAction<
+  @sharedRoute
+  @action("verify")
+  verifyWithCode is Operations.ResourceAction<
     NumberVerificationEndpoint,
     NumberVerificationContent,
     NumberVerificationResult
   >;
 
-  @doc("Retrieves the phone number (MSISDN) associated with a device.")
-  retrieve is Operations.ResourceAction<
+  @doc("Retrieves the phone number (MSISDN) associated with a device. As part of the frontend authorisation flow, the device is redirected to the operator network to authenticate directly.")
+  @sharedRoute
+  @action("retrieve")
+  retrieveWithoutCode is Operations.ResourceAction<
     NumberVerificationEndpoint,
-    NetworkIdentifier,
+    NumberRetrievalContent,
+    TypeSpec.Http.Response<302> & EmptyResponse,
+    TraitOverride<ResponseHeadersTrait<{
+      @header location: string;
+    } & RequestIdResponseHeader>>
+  >;
+  
+  @doc("Retrieves the phone number (MSISDN) associated with a device.")
+  @sharedRoute
+  @action("retrieve")
+  retrieveWithCode is Operations.ResourceAction<
+    NumberVerificationEndpoint,
+    NumberRetrievalContent,
     NumberRetrievalResult
   >;
 }
@@ -57,9 +86,27 @@ model NumberVerificationContent {
   networkIdentifier: NetworkIdentifier;
 
   ...NumberDevice;
+
+  @doc("The code provided by APC is exchange for the operator code.")
+  apcCode?: string;
+}
+
+@doc("Request to retrieve number of device")
+model NumberRetrievalContent {
+  @doc("Identifier for the network to query for this device.")
+  networkIdentifier: NetworkIdentifier;
+
+  @doc("The code provided by APC is exchange for the operator code.")
+  apcCode?: string;
 }
 
 /// Response models
+
+@doc("Empty model to return as part of 302 redirect")
+model EmptyResponse {
+  @doc("Optional content")
+  content?: string;
+}
 
 @doc("Response verifying number of device")
 model NumberVerificationResult {
